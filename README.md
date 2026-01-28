@@ -91,19 +91,7 @@ VehicleVision-NG/
 ├── README.md
 ```
 
----
 
-## 📜 License
-
-Academic/Research Use Only – Not for commercial deployment.
 
 ---
-
-## 👤 Contributors
-
-BSc Research Project Team
-
----
-
-**Version:** 1.0.0  
-**Last Updated:** January 2026
+Thank you for your interest in VehicleVision-NG!
