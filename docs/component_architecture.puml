@@ -1,0 +1,199 @@
+@startuml Component Architecture - Technology Stack
+
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle uml2
+skinparam PackageBackgroundColor transparent
+
+title Stolen Vehicle Detection System - Component Architecture
+footer BSc Research Project - Technology Stack Overview
+
+' ============ PRESENTATION TIER ============
+package "Presentation Tier" as Presentation #E8F4FD {
+    
+    component "React SPA" as ReactApp {
+        component "React Router" as Router
+        component "Auth Context" as AuthContext
+        component "API Service\n(Axios)" as Axios
+    }
+    
+    component "UI Pages" as UIPages {
+        [Login] #LightGreen
+        [Dashboard] #LightGreen
+        [Camera] #LightYellow
+        [Upload] #LightYellow
+        [Logs] #LightBlue
+        [Stolen Vehicles] #LightCoral
+        [Users] #LightCoral
+    }
+    
+    note top of ReactApp
+        **Frontend Tech Stack:**
+        • React 18.x
+        • Vite (Build Tool)
+        • React Router DOM
+        • Axios (HTTP Client)
+        • TailwindCSS (Styling)
+    end note
+}
+
+' ============ APPLICATION TIER ============
+package "Application Tier" as Application #FDF5E6 {
+    
+    component "FastAPI Server" as FastAPI {
+        component "Uvicorn\nASGI Server" as Uvicorn
+        component "API Routers" as Routers
+        component "WebSocket\nHandler" as WSHandler
+    }
+    
+    component "API Routes" as APIRoutes {
+        [/auth/*] as AuthAPI #LightGreen
+        [/detection/*] as DetectAPI #LightYellow
+        [/logs/*] as LogsAPI #LightBlue
+        [/stolen-vehicles/*] as StolenAPI #LightCoral
+    }
+    
+    component "Authentication" as Authentication {
+        [JWT Handler] as JWTHandler
+        [Passlib\nBcrypt] as Passlib
+        [OAuth2\nPassword] as OAuth2
+    }
+    
+    note right of FastAPI
+        **Backend Tech Stack:**
+        • Python 3.10+
+        • FastAPI
+        • Uvicorn (ASGI)
+        • Pydantic (Validation)
+        • SQLAlchemy (ORM)
+    end note
+}
+
+' ============ DETECTION ENGINE ============
+package "Detection Engine" as Engine #E6F3E6 {
+    
+    component "YOLOv8\n(Vehicle Detection)" as YOLO {
+        [COCO Pretrained\nWeights] as COCOWeights
+        [Vehicle Classifier\n(Car/Truck/Bus/Motorcycle)] as VehClassifier
+    }
+    
+    component "Plate Detection" as PlateDetection {
+        [Roboflow\nWorkflow API] as RoboflowAPI
+        [Local YOLO\nPlate Model] as LocalPlate
+    }
+    
+    component "OCR System" as OCRSystem {
+        [Google Vision\nOCR] as GoogleOCR
+        [EasyOCR\n(Fallback)] as EasyOCR
+    }
+    
+    component "Enhancement\nServices" as Enhancement {
+        [Geometry\nCorrector] as GeomCorr
+        [Q/O\nDisambiguator] as QODisamb
+        [Plate\nValidator] as PlateValidator
+        [Color\nDetector] as ColorDetector
+    }
+    
+    note bottom of YOLO
+        **ML/CV Libraries:**
+        • Ultralytics (YOLOv8)
+        • OpenCV
+        • NumPy
+        • Roboflow SDK
+        • EasyOCR
+    end note
+}
+
+' ============ SERVICE LAYER ============
+package "Service Layer" as Services #FFF0F5 {
+    
+    component "Core Services" as CoreServices {
+        [DetectionService] as DetService
+        [OCRService] as OCRService
+        [RoboflowWorkflowService] as RoboService
+    }
+    
+    component "Data Services" as DataServices {
+        [DatabaseService] as DBService
+        [StolenVehicleService] as StolenService
+        [DetectionLogService] as LogService
+    }
+    
+    component "Utility Services" as UtilServices {
+        [EmailService\n(Brevo SMTP)] as EmailService
+        [VideoProcessor] as VideoProcessor
+        [ImageQualityService] as QualityService
+        [TrackingService] as TrackingService
+    }
+}
+
+' ============ DATA TIER ============
+package "Data Tier" as DataTier #FFE4E1 {
+    
+    database "SQLite Database" as SQLite {
+        [users] as UsersTable
+        [stolen_vehicles] as StolenTable
+        [detection_logs] as LogsTable
+    }
+    
+    component "SQLAlchemy ORM" as ORM {
+        [User Model] as UserModel
+        [StolenVehicle Model] as StolenModel
+        [DetectionLog Model] as LogModel
+    }
+    
+    folder "File Storage" as Storage {
+        [Uploaded Videos] as Videos
+        [Detection Images] as Images
+        [Model Weights] as Weights
+    }
+}
+
+' ============ EXTERNAL SERVICES ============
+cloud "External Services" as External #F0F8FF {
+    [Roboflow\nInference API] as RoboflowCloud
+    [Google Cloud\nVision API] as GoogleCloud
+    [Brevo\nSMTP Service] as BrevoCloud
+}
+
+' ============ CONNECTIONS ============
+
+' Frontend to Backend
+ReactApp --> FastAPI : HTTP/HTTPS
+Axios --> Routers : REST API Calls
+WSHandler <--> [Camera] : WebSocket
+
+' API Routes to Services
+AuthAPI --> Authentication
+DetectAPI --> CoreServices
+LogsAPI --> DataServices
+StolenAPI --> DataServices
+
+' Detection Flow
+CoreServices --> Engine
+DetService --> YOLO
+DetService --> PlateDetection
+PlateDetection --> OCRSystem
+OCRSystem --> Enhancement
+
+' Services to Data
+DataServices --> ORM
+ORM --> SQLite
+
+' External Connections
+RoboService --> RoboflowCloud
+OCRSystem --> GoogleCloud
+EmailService --> BrevoCloud
+
+' ============ LEGEND ============
+legend right
+    |= Color |= Component Type |
+    | <#E8F4FD> | Presentation |
+    | <#FDF5E6> | Application |
+    | <#E6F3E6> | AI/ML Engine |
+    | <#FFF0F5> | Services |
+    | <#FFE4E1> | Data Storage |
+    | <#F0F8FF> | External APIs |
+endlegend
+
+@enduml

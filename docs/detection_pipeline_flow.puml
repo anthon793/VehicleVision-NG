@@ -1,0 +1,232 @@
+@startuml Detection Pipeline - Detailed Flow
+
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+title Vehicle & License Plate Detection Pipeline
+footer BSc Research Project - Two-Stage Detection with OCR Enhancement
+
+start
+:Receive Input Frame;
+note right
+    Sources:
+    • Live Camera Feed
+    • Uploaded Image
+    • Video Frame
+end note
+
+' ============ STAGE 1: VEHICLE DETECTION ============
+partition "**STAGE 1: Vehicle Detection**" #E6FFE6 {
+    :Load YOLOv8 COCO Model;
+    :Run Inference on Frame;
+    
+    if (Vehicles Detected?) then (yes)
+        :Extract Vehicle Bounding Boxes;
+        :Classify Vehicle Type;
+        note right
+            Classes:
+            • Car (class 2)
+            • Motorcycle (class 3)
+            • Bus (class 5)
+            • Truck (class 7)
+        end note
+        
+        :Crop Vehicle Regions;
+        :Detect Dominant Color;
+        note right
+            HSV-based color detection
+            Exclude plate region
+            Colors: Black, White, Red,
+            Blue, Green, Silver, etc.
+        end note
+    else (no)
+        :Try Direct Plate Detection on Full Frame;
+    endif
+}
+
+' ============ STAGE 2: PLATE DETECTION ============
+partition "**STAGE 2: License Plate Detection**" #E6F0FF {
+    
+    :Check Detection Method Available;
+    
+    switch (Detection Method?)
+        case (Roboflow Workflow)
+            :Resize Image (max 1280px);
+            :Apply CLAHE Enhancement;
+            :Light Sharpening;
+            :Encode to Base64;
+            :Call Roboflow Workflow API;
+            note right
+                Workflow: ngplates
+                • lpd-pfzpe/5 (Plate Detection)
+                • Dynamic Crop
+                • Google Vision OCR
+            end note
+            
+        case (Local YOLO Model)
+            :Run Local Plate YOLO;
+            :Extract Plate Regions;
+            
+        case (Estimation Fallback)
+            :Estimate Plate Region;
+            note right
+                Use image processing
+                if no model available
+            end note
+    endswitch
+    
+    :Extract Plate Crops;
+}
+
+' ============ STAGE 3: OCR & ENHANCEMENT ============
+partition "**STAGE 3: OCR & Text Enhancement**" #FFF5E6 {
+    
+    :Get Raw OCR Text;
+    
+    :Apply Geometry Correction;
+    note right
+        **PlateGeometryCorrector:**
+        • Detect skew angle
+        • Perspective correction
+        • Rotation normalization
+        • Edge-based alignment
+    end note
+    
+    if (Text Quality < Threshold?) then (poor)
+        :Try OCR with Geometric Variants;
+        :Rotate: 0°, ±5°, ±10°;
+        :Select Best Result;
+    endif
+    
+    :Apply Q/O Disambiguation;
+    note right
+        **QODisambiguator:**
+        • Pattern-based rules
+        • Context analysis
+        • Temporal voting (video)
+        • Nigerian format constraints
+    end note
+    
+    :Normalize Plate Text;
+    note left
+        • Remove spaces/hyphens
+        • Convert to uppercase
+        • Fix common OCR errors
+            I→1, O→0, Z→2, etc.
+    end note
+    
+    :Validate Nigerian Format;
+    note right
+        **Formats Supported:**
+        • ABC-123-XY (Federal)
+        • AB-123-ABC (State)
+        • 01A-123AB (Diplomatic)
+    end note
+    
+    if (Valid Format?) then (yes)
+        :Mark as Validated;
+        :Boost Confidence Score;
+    else (no)
+        :Keep Original;
+        :Lower Confidence;
+    endif
+}
+
+' ============ STAGE 4: POST-PROCESSING ============
+partition "**STAGE 4: Database Check & Alerting**" #FFE6E6 {
+    
+    :Normalize Plate for Lookup;
+    
+    :Query Stolen Vehicles Database;
+    
+    if (Match Found?) then (STOLEN!)
+        #FF6666:Flag as STOLEN VEHICLE;
+        
+        :Create Detection Log Entry;
+        note right
+            Log includes:
+            • Plate number
+            • Vehicle type & color
+            • Timestamp & location
+            • Confidence score
+            • Image reference
+            • Match status: STOLEN
+        end note
+        
+        :Trigger Email Alert (Async);
+        note right
+            **Email Alert Contents:**
+            • Plate number
+            • Vehicle description
+            • Detection timestamp
+            • Capture location
+            • Confidence score
+            • Annotated image (optional)
+        end note
+        
+    else (not stolen)
+        :Mark as Normal Detection;
+        :Log Detection Entry;
+    endif
+    
+    :Apply Object Tracking;
+    note left
+        Track same vehicle
+        across frames to avoid
+        duplicate alerts
+    end note
+}
+
+' ============ RESPONSE GENERATION ============
+partition "**STAGE 5: Response Generation**" #F0F0F0 {
+    
+    :Draw Bounding Boxes;
+    note right
+        • Green: Vehicle bbox
+        • Blue: Plate bbox
+        • Red: If stolen
+    end note
+    
+    :Add Text Labels;
+    note right
+        Label format:
+        "[Vehicle Type] | [Color]
+         [Plate Number] (Confidence%)"
+    end note
+    
+    :Encode Annotated Image;
+    
+    :Build JSON Response;
+    note right
+        Response includes:
+        • annotated_image (base64)
+        • detections[] array
+        • is_stolen boolean
+        • processing_time
+        • quality_metrics
+    end note
+}
+
+:Return Detection Results;
+
+stop
+
+' ============ NOTES ============
+note as N1
+    **Performance Optimizations:**
+    • Image resizing before API calls
+    • Async email sending
+    • Singleton service instances
+    • Confidence-based adaptive processing
+    • Frame skipping for video
+end note
+
+note as N2
+    **External Dependencies:**
+    • Roboflow Inference API
+    • Google Vision OCR
+    • YOLOv8 (Ultralytics)
+    • EasyOCR (fallback)
+    • Brevo SMTP (email)
+end note
+
+@enduml

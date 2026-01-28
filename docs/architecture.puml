@@ -1,0 +1,216 @@
+@startuml Stolen Vehicle Detection System Architecture
+
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle uml2
+skinparam ArrowColor #333333
+skinparam ArrowThickness 2
+
+title Stolen Vehicle Detection System - Complete Architecture Flow
+footer BSc Research Project | Vehicle & License Plate Recognition System
+
+' =============== ACTORS ===============
+actor "User/Admin" as User #lightblue
+actor "Camera Feed" as Camera #lightyellow
+actor "Email Recipients" as EmailRecipient #lightgreen
+
+' =============== FRONTEND LAYER ===============
+package "Frontend Layer (React + Vite)" as Frontend #E8F4FD {
+    
+    package "Pages" as Pages {
+        [LoginPage] as Login
+        [DashboardPage] as Dashboard
+        [CameraPage] as CameraUI
+        [UploadPage] as UploadUI
+        [LogsPage] as LogsUI
+        [StolenVehiclesPage] as StolenUI
+        [UsersPage] as UsersUI
+        [TestDetectionPage] as TestUI
+    }
+    
+    package "Core Components" as Components {
+        [AuthContext] as AuthCtx
+        [Layout] as Layout
+        [API Service] as APIService
+    }
+    
+    note right of Pages
+        **React Router Navigation**
+        - Protected Routes require auth
+        - Admin Routes for management
+    end note
+}
+
+' =============== BACKEND API LAYER ===============
+package "Backend API Layer (FastAPI)" as Backend #FDF5E6 {
+    
+    package "Routes (API Endpoints)" as Routes {
+        [auth_routes.py] as AuthRoutes
+        [detection.py] as DetectionRoutes
+        [logs.py] as LogsRoutes
+        [stolen_vehicles.py] as StolenRoutes
+    }
+    
+    package "Authentication" as Auth {
+        [JWT Token Handler] as JWT
+        [Password Hashing] as PassHash
+        [User Dependencies] as UserDeps
+    }
+    
+    note right of Routes
+        **API Endpoints:**
+        /auth/* - Login, Register, Users
+        /detection/* - Frame, Video, WebSocket
+        /logs/* - Detection history
+        /stolen-vehicles/* - CRUD operations
+    end note
+}
+
+' =============== DETECTION PIPELINE ===============
+package "Detection Pipeline (Core Engine)" as DetectionPipeline #E6F3E6 {
+    
+    package "Stage 1: Vehicle Detection" as Stage1 {
+        [YOLOv8 COCO Model] as YOLO
+        [Vehicle Classifier] as VehicleClass
+        note bottom of VehicleClass
+            Detects: Car, Truck,
+            Bus, Motorcycle
+        end note
+    }
+    
+    package "Stage 2: Plate Detection" as Stage2 {
+        [Roboflow Workflow API] as Roboflow
+        [Local Plate Model] as LocalPlate
+        [Plate Region Estimator] as PlateEst
+    }
+    
+    package "Stage 3: OCR & Enhancement" as Stage3 {
+        [Google Vision OCR] as GOCR
+        [EasyOCR Fallback] as EasyOCR
+        [Geometry Corrector] as GeomCorr
+        [Q/O Disambiguator] as QODisamb
+        [Plate Validator] as PlateVal
+    }
+    
+    package "Stage 4: Post-Processing" as Stage4 {
+        [Color Detection] as ColorDet
+        [Image Quality Check] as QualityCheck
+        [Object Tracking] as Tracking
+        [Confidence Pipeline] as ConfPipe
+    }
+}
+
+' =============== SERVICES LAYER ===============
+package "Services Layer" as Services #FFF0F5 {
+    
+    [DetectionService] as DetService
+    [RoboflowWorkflowService] as RoboService
+    [OCRService] as OCRService
+    [DatabaseService] as DBService
+    [EmailService] as EmailService
+    [VideoProcessor] as VideoProc
+    [ROIProcessor] as ROIProc
+    
+    note bottom of RoboService
+        **Roboflow Workflow:**
+        1. Resize & Preprocess
+        2. Plate Detection (lpd-pfzpe/5)
+        3. Dynamic Crop
+        4. Google Vision OCR
+        5. Geometry Enhancement
+    end note
+}
+
+' =============== DATABASE LAYER ===============
+database "SQLite Database" as DB #FFE4E1 {
+    [Users Table] as UsersTable
+    [StolenVehicles Table] as StolenTable
+    [DetectionLogs Table] as LogsTable
+}
+
+' =============== EXTERNAL SERVICES ===============
+cloud "External Services" as External #F0F8FF {
+    [Roboflow API] as RoboAPI
+    [Google Vision API] as GoogleAPI
+    [Brevo SMTP] as Brevo
+}
+
+' =============== DATA FLOW CONNECTIONS ===============
+
+' User interactions
+User --> Login : 1. Authenticate
+Login --> AuthRoutes : POST /auth/login
+AuthRoutes --> JWT : Generate Token
+JWT --> AuthCtx : Store Token
+
+User --> Dashboard : 2. View Stats
+Dashboard --> DetectionRoutes : GET /detection/stats
+Dashboard --> LogsRoutes : GET /logs
+
+' Camera/Upload Flow
+Camera --> CameraUI : Live Feed
+User --> UploadUI : Upload Image/Video
+
+' Detection Flow - Main Path
+CameraUI --> DetectionRoutes : POST /detection/frame
+UploadUI --> DetectionRoutes : POST /detection/upload
+DetectionRoutes --> DetService : Process Frame
+
+' Stage 1: Vehicle Detection
+DetService --> YOLO : Detect Vehicles
+YOLO --> VehicleClass : Classify (Car/Truck/Bus/Motorcycle)
+VehicleClass --> ColorDet : Extract Dominant Color
+
+' Stage 2: Plate Detection
+VehicleClass --> RoboService : Detect Plates
+RoboService --> RoboAPI : API Call
+RoboAPI --> GOCR : OCR Text
+GOCR --> RoboService : Return Results
+
+' Stage 3: Enhancement
+RoboService --> GeomCorr : Perspective Correction
+GeomCorr --> QODisamb : Handle Q/O/0 Confusion
+QODisamb --> PlateVal : Validate Nigerian Format
+
+' Stage 4: Post-Processing
+PlateVal --> ConfPipe : Calculate Confidence
+ConfPipe --> Tracking : Track Objects
+Tracking --> QualityCheck : Assess Quality
+
+' Database Operations
+QualityCheck --> DBService : Check Stolen Database
+DBService --> StolenTable : Query Match
+StolenTable --> DBService : Return Match Status
+DBService --> LogsTable : Log Detection
+
+' Alert Flow
+DBService --> EmailService : If Stolen Match
+EmailService --> Brevo : Send Alert Email
+Brevo --> EmailRecipient : Receive Alert
+
+' Response Flow
+DBService --> DetectionRoutes : Detection Results
+DetectionRoutes --> CameraUI : Annotated Image + Data
+DetectionRoutes --> UploadUI : Processing Results
+
+' Admin Operations
+User --> StolenUI : Manage Stolen DB
+StolenUI --> StolenRoutes : CRUD Operations
+StolenRoutes --> DBService : Update Database
+
+User --> LogsUI : View History
+LogsUI --> LogsRoutes : GET /logs
+LogsRoutes --> DBService : Query Logs
+
+' =============== LEGEND ===============
+legend right
+    |= Component |= Description |
+    | Frontend | React SPA with Vite |
+    | Backend | FastAPI REST API |
+    | Detection | YOLOv8 + Roboflow |
+    | OCR | Google Vision + EasyOCR |
+    | Database | SQLite with SQLAlchemy |
+    | Alerts | Brevo SMTP for emails |
+endlegend
+
+@enduml
