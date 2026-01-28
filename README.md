@@ -1,7 +1,3 @@
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/anthon793/VehicleVision-NG.git
-git push -u origin main
 
 # VehicleVision-NG
 
@@ -36,7 +32,7 @@ VehicleVision-NG is an open-source platform for real-time vehicle and license pl
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/VehicleVision-NG.git
+git clone https://github.com/anthon793/VehicleVision-NG.git
 cd VehicleVision-NG
 ```
 
